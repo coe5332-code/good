@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from utils import fetch_data_with_controls
+from frontend.frontend_utils import fetch_data_with_controls
 
 def show_bsk_centers():
     st.header("BSK Centers")
