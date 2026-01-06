@@ -20,9 +20,13 @@ try:
     # `training-video-generation/app.py` if present (some deployments use that name).
     pkg_dir = BASE_DIR / "training_video_generation"
     legacy_dir = BASE_DIR / "training-video-generation"
+    # Also check for the new `train_video_main/train-video-main` layout
+    new_dir = BASE_DIR / "train_video_main" / "train-video-main"
 
     if pkg_dir.exists():
         runpy.run_module("training_video_generation.app", run_name="__main__")
+    elif new_dir.exists():
+        runpy.run_path(str(new_dir / "app.py"), run_name="__main__")
     elif legacy_dir.exists():
         runpy.run_path(str(legacy_dir / "app.py"), run_name="__main__")
     else:
