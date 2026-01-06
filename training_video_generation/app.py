@@ -4,14 +4,21 @@ import logging
 import os
 import tempfile
 
-from utils.service_utils import create_service_sections, validate_service_content
-from utils.audio_utils import text_to_speech
-from utils.video_utils import create_slide, combine_slides_and_audio
-from services.unsplash_service import fetch_and_save_photo
-from services.gemini_service import generate_slides_from_raw
-from utils.avatar_utils import add_avatar_to_slide
-from utils.pdf_extractor import extract_raw_content
-from utils.pdf_utils import generate_service_pdf
+# ✅ FIXED IMPORTS (ABSOLUTE PACKAGE IMPORTS)
+from training_video_generation.utils.audio_utils import text_to_speech
+from training_video_generation.utils.video_utils import (
+    create_slide,
+    combine_slides_and_audio,
+)
+from training_video_generation.services.unsplash_service import fetch_and_save_photo
+from training_video_generation.services.gemini_service import generate_slides_from_raw
+from training_video_generation.utils.avatar_utils import add_avatar_to_slide
+from training_video_generation.utils.pdf_extractor import extract_raw_content
+from training_video_generation.utils.pdf_utils import generate_service_pdf
+from training_video_generation.utils.service_utils import (
+    create_service_sections,
+    validate_service_content,
+)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -88,7 +95,6 @@ def show_create_video_page(selected_voice, uploaded_pdf):
     st.markdown("**Create training videos for BSK data entry operators**")
     st.markdown("---")
 
-    # ---------------- FORM UI (UNCHANGED) ----------------
     with st.form("service_form"):
         st.subheader("📋 Service Training Information")
 
@@ -118,7 +124,6 @@ def show_create_video_page(selected_voice, uploaded_pdf):
 
         submitted = st.form_submit_button("🚀 Generate Training Video")
 
-    # ---------------- GENERATION LOGIC ----------------
     if submitted:
         try:
             progress = st.progress(0)
@@ -127,12 +132,8 @@ def show_create_video_page(selected_voice, uploaded_pdf):
             video_clips = []
             audio_paths = []
 
-            # ==================================================
-            # CASE 1: PDF EXISTS → IGNORE FORM
-            # ==================================================
             if uploaded_pdf:
-                status.text("📄 Extracting content from PDF (form ignored)...")
-
+                status.text("📄 Extracting content from PDF...")
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                     tmp.write(uploaded_pdf.read())
                     pdf_path = tmp.name
@@ -140,9 +141,6 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                 pages = extract_raw_content(pdf_path)
                 raw_text = "\n".join(line for page in pages for line in page["lines"])
 
-            # ==================================================
-            # CASE 2: FORM → RAW TEXT
-            # ==================================================
             else:
                 service_content = {
                     "service_name": service_name,
@@ -161,33 +159,15 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                     st.error(msg)
                     return
 
-                # 1️⃣ Generate & SAVE PDF
-                status.text("📄 Generating training PDF from form...")
+                status.text("📄 Generating training PDF...")
                 pdf_path = generate_service_pdf(service_content)
 
-                # Optional: show download button
-                with open(pdf_path, "rb") as f:
-                    st.download_button(
-                        "📥 Download Training PDF",
-                        data=f.read(),
-                        file_name=os.path.basename(pdf_path),
-                        mime="application/pdf",
-                    )
-
-                # 2️⃣ Extract text from the saved PDF
                 pages = extract_raw_content(pdf_path)
                 raw_text = "\n".join(line for page in pages for line in page["lines"])
 
-            # ==================================================
-            # GEMINI → SLIDES (NEW API)
-            # ==================================================
-            status.text("🧠 Structuring training slides using AI...")
-            slides_response = generate_slides_from_raw(raw_text)
-            slides = slides_response["slides"]
+            status.text("🧠 Structuring slides using AI...")
+            slides = generate_slides_from_raw(raw_text)["slides"]
 
-            # ==================================================
-            # VIDEO PIPELINE
-            # ==================================================
             for i, slide in enumerate(slides):
                 status.text(f"🎬 Creating slide {i + 1}/{len(slides)}")
 
@@ -195,71 +175,29 @@ def show_create_video_page(selected_voice, uploaded_pdf):
                 audio = asyncio.run(text_to_speech(narration, voice=selected_voice))
                 audio_paths.append(audio)
 
-                try:
-                    image = fetch_and_save_photo(slide["image_keyword"])
-                except Exception as img_error:
-                    # Fallback to default image if fetch fails
-                    fallback = os.path.join("images", "fallback_video.jpg")
-                    if not os.path.exists(fallback):
-                        # Create a simple fallback if it doesn't exist
-                        try:
-                            from PIL import Image
-                            os.makedirs("images", exist_ok=True)
-                            img = Image.new("RGB", (1280, 720), (30, 30, 40))
-                            img.save(fallback, "JPEG", quality=90)
-                        except Exception:
-                            pass
-                    image = fallback if os.path.exists(fallback) else os.path.join("assets", "default_background.jpg")
-
+                image = fetch_and_save_photo(slide["image_keyword"])
                 clip = create_slide(slide["title"], slide["bullets"], image, audio)
                 clip = add_avatar_to_slide(clip, audio_duration=clip.duration)
                 video_clips.append(clip)
+
                 progress.progress(int((i + 1) / len(slides) * 80))
 
             status.text("🎞️ Rendering final video...")
-            final_path = combine_slides_and_audio(
-                video_clips, audio_paths, service_name=service_name or "BSK_Service"
-            )
+            final_path = combine_slides_and_audio(video_clips, audio_paths)
 
             progress.progress(100)
-            st.session_state["video_path"] = final_path
-            st.session_state["audio_paths"] = audio_paths
-
-            status.empty()
-            progress.empty()
-
+            st.video(final_path)
             st.success("✅ Training video generated successfully!")
-            st.balloons()
 
         except Exception as e:
             st.error(f"❌ Error generating video: {e}")
 
-    # ---------------- DISPLAY RESULT ----------------
-    if "video_path" in st.session_state:
-        st.markdown("---")
-        st.subheader("🎬 Generated Training Video")
-
-        with open(st.session_state["video_path"], "rb") as f:
-            st.video(f.read())
-
-        st.download_button(
-            "📥 Download Video",
-            data=open(st.session_state["video_path"], "rb").read(),
-            file_name=os.path.basename(st.session_state["video_path"]),
-            mime="video/mp4",
-        )
-
-        if st.button("🔄 Generate New"):
-            st.session_state.clear()
-            st.rerun()
-
 
 # -------------------------------------------------
-# EXISTING VIDEOS PAGE (UNCHANGED)
+# EXISTING VIDEOS PAGE
 # -------------------------------------------------
 def show_existing_videos_page():
     st.title("📂 Existing Training Videos")
-    st.markdown("---")
 
     output_dir = "output_videos"
     if not os.path.exists(output_dir):
@@ -267,14 +205,9 @@ def show_existing_videos_page():
         return
 
     videos = [f for f in os.listdir(output_dir) if f.endswith(".mp4")]
-    if not videos:
-        st.info("No videos available.")
-        return
-
     selected = st.selectbox("Select a video:", videos)
-    path = os.path.join(output_dir, selected)
 
-    with open(path, "rb") as f:
+    with open(os.path.join(output_dir, selected), "rb") as f:
         st.video(f.read())
 
 

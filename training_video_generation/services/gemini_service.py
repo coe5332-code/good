@@ -3,7 +3,14 @@ Gemini slide generator
 RAW PDF text → CLEAN SLIDES (STRICT FORMAT)
 """
 
-import google.genai as genai
+try:
+    import google.genai as genai
+except ModuleNotFoundError as e:
+    raise ModuleNotFoundError(
+        "Missing required module 'google.genai'.\n"
+        "Install the Google Generative AI Python SDK, e.g. `pip install google-genai`,\n"
+        "and add it to your project's requirements. See Google GenAI SDK docs for details."
+    ) from e
 import json
 import re
 import os
@@ -114,7 +121,7 @@ def generate_slides_from_raw(raw_text: str):
 
 if __name__ == "__main__":
     
-    from utils.pdf_extractor import extract_raw_content
+    from training_video_generation.utils.pdf_extractor import extract_raw_content
     PDF_PATH = r"C:\Users\techt\Downloads\ilovepdf_merged.pdf"
     RAW_CONTENT = extract_raw_content(PDF_PATH)
     slides = generate_slides_from_raw(RAW_CONTENT)

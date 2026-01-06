@@ -1,4 +1,4 @@
-from utils.avatar_utils import add_avatar_to_slide
+from training_video_generation.utils.avatar_utils import add_avatar_to_slide
 import os
 import tempfile
 from PIL import Image, ImageDraw, ImageFont

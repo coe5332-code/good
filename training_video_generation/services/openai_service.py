@@ -115,7 +115,7 @@ def generate_slides_from_raw(raw_text: str):
 # TEST
 # -------------------------------------------------
 if __name__ == "__main__":
-    from utils.pdf_extractor import extract_raw_content
+    from training_video_generation.utils.pdf_extractor import extract_raw_content
 
     PDF_PATH = r"C:\Users\techt\Downloads\ilovepdf_merged.pdf"
     RAW_CONTENT = extract_raw_content(PDF_PATH)
