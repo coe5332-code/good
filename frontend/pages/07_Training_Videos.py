@@ -15,11 +15,19 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 try:
-    # run the training video app as a MODULE
-    runpy.run_module(
-        "training_video_generation.app",
-        run_name="__main__"
-    )
+    # Run the training video app. Prefer the new package layout
+    # (`training_video_generation`) but fall back to the legacy
+    # `training-video-generation/app.py` if present (some deployments use that name).
+    pkg_dir = BASE_DIR / "training_video_generation"
+    legacy_dir = BASE_DIR / "training-video-generation"
+
+    if pkg_dir.exists():
+        runpy.run_module("training_video_generation.app", run_name="__main__")
+    elif legacy_dir.exists():
+        runpy.run_path(str(legacy_dir / "app.py"), run_name="__main__")
+    else:
+        # Last resort: attempt the module import (will raise and be shown)
+        runpy.run_module("training_video_generation.app", run_name="__main__")
 except Exception as e:
     st.error("Failed to load video generator")
     st.code(traceback.format_exc())
